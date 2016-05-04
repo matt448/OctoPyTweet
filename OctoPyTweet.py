@@ -164,7 +164,7 @@ if sendtweet:
     print '---------------------'
     api = TwitterAPI(CONSUMER_KEY, CONSUMER_SECRET, ACCESS_TOKEN_KEY, ACCESS_TOKEN_SECRET)
     #Grab picture from web cam
-    r = requests.get('http://127.0.0.1:8080/?action=snapshot')
+    r = requests.get('http://' + host + ':8080/?action=snapshot')
     picdata = r.content
     r = api.request('statuses/update_with_media', {'status':status_msg}, {'media[]':picdata})
     print 'Twitter status code: ' + str(r.status_code)
