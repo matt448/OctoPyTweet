@@ -1,0 +1,17 @@
+# Replace all of the API keys with real values
+# and rename this file to config.cfg
+
+[OctoPrintAPI]
+host: 127.0.0.1
+apikey: PUTYOUROCTOPRINTAPIKEYHERE 
+
+[TwitterAPI]
+CONSUMER_KEY: putyourtwitterconsumerkeyhere
+CONSUMER_SECRET: putyourtwitterconsumersecrethere
+ACCESS_TOKEN_KEY: putyourtwitteraccesstokenkeyhere
+ACCESS_TOKEN_SECRET: putyourtwitteraccesstokensecrethere
+
+[Debug]
+#0 = Debug output disabled
+#1 = Debug output enabled
+debug_enabled: 0
