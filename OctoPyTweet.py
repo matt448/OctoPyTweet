@@ -161,7 +161,7 @@ else:
     print 'Current: ' + str(printpercent) + '%'
     print '   Last: ' + str(last_percent) + '%'
 
-sendtweet = True
+#sendtweet = True
 if sendtweet:
     print 'Updating ' + tmpfile
     writetmpfile(printpercent)
