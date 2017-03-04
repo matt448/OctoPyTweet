@@ -15,3 +15,7 @@ This would be better if it was an OctoPrint plug-in but what can you do. It work
 - Edit config.cfg and replace settings with real values.
 
 - Create a cronjob that runs OctoPyTweet.py once a minute.
+
+
+# Sample Tweet
+  ![tweet_sample](images/tweet_sample.png)
