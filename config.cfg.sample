@@ -10,8 +10,8 @@ CONSUMER_KEY: putyourtwitterconsumerkeyhere
 CONSUMER_SECRET: putyourtwitterconsumersecrethere
 ACCESS_TOKEN_KEY: putyourtwitteraccesstokenkeyhere
 ACCESS_TOKEN_SECRET: putyourtwitteraccesstokensecrethere
+TWEETS_ENABLED: True
 
 [Debug]
-#0 = Debug output disabled
-#1 = Debug output enabled
-debug_enabled: 0
+debug_enabled: False
+
