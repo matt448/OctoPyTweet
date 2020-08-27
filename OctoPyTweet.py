@@ -14,7 +14,11 @@
 # This would be better if it was an OctoPrint plug-in but what can you do.
 # It works and I don't have time to learn how to make a plug-in right now.
 #
-
+from io import BytesIO
+from wand.image import Image
+from wand.drawing import Drawing
+from wand.drawing import Color
+from wand.display import display
 
 from TwitterAPI import TwitterAPI
 import requests
@@ -22,6 +26,9 @@ import time
 import os
 import ConfigParser
 
+degree_sign= u'\N{DEGREE SIGN}'
+logo = Image(filename='images/logo.png')
+thermo = Image(filename='images/thermo.png')
 
 # Read settings from the config file
 settings = ConfigParser.ConfigParser()
@@ -33,6 +40,7 @@ CONSUMER_KEY = settings.get('TwitterAPI', 'CONSUMER_KEY')
 CONSUMER_SECRET = settings.get('TwitterAPI', 'CONSUMER_SECRET')
 ACCESS_TOKEN_KEY = settings.get('TwitterAPI', 'ACCESS_TOKEN_KEY')
 ACCESS_TOKEN_SECRET = settings.get('TwitterAPI', 'ACCESS_TOKEN_SECRET')
+tweets_enabled = int(settings.get('TwitterAPI', 'TWEETS_ENABLED'))
 
 #Header for Octoprint API requests
 headers = {'X-Api-Key': apikey}
@@ -71,6 +79,65 @@ def writetmpfile( printpercent ):
     file.close()
     return
 
+def send_the_tweet():
+    print "Calling tweet function"
+    print "tweets_enabled:" + str(tweets_enabled)
+    if tweets_enabled == 0:
+        print 'Tweeting has been disabled by the config file'
+        return
+    if tweets_enabled == 1:
+        print 'Updating ' + tmpfile
+        writetmpfile(printpercent)
+        print 'Message length: ' + str(len(status_msg))
+        print 'Sending tweet!'
+        print '---------------------'
+        print status_msg
+        print '---------------------'
+        api = TwitterAPI(CONSUMER_KEY, CONSUMER_SECRET, ACCESS_TOKEN_KEY, ACCESS_TOKEN_SECRET)
+        #Grab picture from web cam
+        r = requests.get('http://' + host + ':8080/?action=snapshot')
+        picdata = r.content
+        img = Image(blob=picdata)
+        s = img.clone()
+        l = logo.clone()
+        t = thermo.clone()
+        l.transparentize(0.30)
+        with Drawing() as draw:
+	    #Draw Octoprint logo in the upper left corner
+	    draw.composite(operator='dissolve', left=525, top=395,
+                width=l.width, height=l.height, image=l)
+	    #Draw transparent black rectangle on the bottom of picture
+	    draw.fill_color = Color('rgba(0, 0, 0, 0.5)')
+	    draw.rectangle(left=0, top=400, right=500, bottom=480, radius=5)
+	    #Insert thermometer pic over transparent rectangle
+	    draw.composite(operator='dissolve', left=7, top=409,
+                width=t.width, height=t.height, image=t)
+	    draw.fill_color = Color('rgba(100, 100, 100, 0.8)')
+	    draw.rectangle(left=55, top=413, right=57, bottom=467)
+	    draw.rectangle(left=300, top=413, right=302, bottom=467)
+	    #Draw text
+	    #Text top row
+	    draw.fill_color = Color('rgba(255, 255, 255, 1.0)')
+	    draw.font = 'fonts/Roboto-Medium.ttf'
+	    draw.font_size = 20
+	    #Hot end text
+	    hotendtext = 'Hot end actual: ' + str(hotendactual) + degree_sign + 'C'
+	    draw.text(65, 430, hotendtext)
+	    hotendtext = 'Hot end target: ' + str(hotendtarget) + degree_sign + 'C'
+	    draw.text(65, 465, hotendtext)
+	    #Bed text
+	    hotendtext = 'Bed actual: ' + str(bedactual) + degree_sign + 'C'
+	    draw.text(310, 430, hotendtext)
+	    hotendtext = 'Bed target: ' + str(bedtarget) + degree_sign + 'C'
+	    draw.text(310, 465, hotendtext)
+	    draw(s) #Apply all the overlay changes
+	    #display(s) #For debug only. Displays image locally.
+            #Convert the wand image back into a blob
+            #that can be sent with requests to the twitter API
+            picdata = s.make_blob('jpeg')
+        r = api.request('statuses/update_with_media', {'status':status_msg}, {'media[]':picdata})
+        print 'Twitter status code: ' + str(r.status_code)
+        print 'Twitter response: ' + str(r.text)
 
 
 
@@ -107,11 +174,14 @@ else:
 
 # Only check job status if the printer is online
 if printeronline:
-    if isprinting is False:
-        print "Not currently printing. Resetting tmp file to zero"
-        writetmpfile(0)
-        exit()
     r = requests.get('http://' + host + '/api/job', headers=headers)
+    print '-------------------------------------------------------------------------'
+    print 'JOB: ' + str(r.json()['job']) 
+    print '-------------------------------------------------------------------------'
+    print 'PROGRESS: ' + str(r.json()['progress'])
+    print '-------------------------------------------------------------------------'
+    print 'STATE: ' + str(r.json()['state'])
+    print '-------------------------------------------------------------------------'
     printtime = r.json()['progress']['printTimeLeft']
     if printtime is None:
         printtimemsg = '00:00:00'
@@ -132,7 +202,7 @@ if printeronline:
         printpercent = int(printpercent)
     printpercentmsg = str(printpercent) + '%'
 
-status_msg = bedmsg + '\r\n' + hotmsg + '\r\n' + 'Print done: ' + str(printpercentmsg)
+status_msg = 'Print done: ' + str(printpercentmsg)
 status_msg += '\r\n #3DPrinting #Printrbot'
 
 
@@ -143,37 +213,23 @@ if last_percent == printpercent:
     print 'Current: ' + str(printpercent) + '%'
     print '   Last: ' + str(last_percent) + '%'
     print
-    sendtweet = False
-elif printpercent == 0 and isprinting:
+elif printpercent == 1  and isprinting:
     status_msg = 'Starting new job!' + '\r\n' + status_msg
-    sendtweet = True
+    send_the_tweet()
+    writetmpfile(printpercent)
 elif printpercent >= (last_percent/10*10) + 10 and isprinting and printpercent < 100:
     print 'Current: ' + str(printpercent) + '%'
     print '   Last: ' + str(last_percent) + '%'
     print
-    sendtweet = True
-elif printpercent == 100:
+    send_the_tweet()
+    writetmpfile(printpercent)
+elif printpercent == 100 and last_percent != 0:
     status_msg = 'Job complete!' + '\r\n' + status_msg
-    sendtweet = True
-    writetmpfile(0) #Set the temp file to zero
+    send_the_tweet()
+    writetmpfile(0) #Set tmp file to zero after job is complete
 else:
     print 'Not tweeting status or writing to tmp file because percent hasn\'t reached threshold'
     print 'Current: ' + str(printpercent) + '%'
     print '   Last: ' + str(last_percent) + '%'
 
-if sendtweet:
-    print 'Updating ' + tmpfile
-    writetmpfile(printpercent)
-    print 'Message length: ' + str(len(status_msg))
-    print 'Sending tweet!'
-    print '---------------------'
-    print status_msg
-    print '---------------------'
-    api = TwitterAPI(CONSUMER_KEY, CONSUMER_SECRET, ACCESS_TOKEN_KEY, ACCESS_TOKEN_SECRET)
-    #Grab picture from web cam
-    r = requests.get('http://' + host + ':8080/?action=snapshot')
-    picdata = r.content
-    r = api.request('statuses/update_with_media', {'status':status_msg}, {'media[]':picdata})
-    print 'Twitter status code: ' + str(r.status_code)
-    #status = api.PostUpdate(status_msg)
-    #print status.text
+
